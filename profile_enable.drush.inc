@@ -36,7 +36,14 @@ function profile_enable_drush_command() {
 }
 
 /**
- * Enable the selected profile and it's depdencies.
+ * Validate callback.
+ *
+ * Determine the dependencies of the profile that the user wants to enable.
+ * This will incldue dependencies of base profiles and nested module
+ * dependencies (if supported by the local Drupal installation).
+ *
+ * @param string $profile
+ *   Name of a Drupal installation profile.
  */
 function drush_profile_enable_validate($profile) {
   // Get the list of valid module names.
@@ -70,6 +77,9 @@ function drush_profile_enable_validate($profile) {
       $profile_dependencies = array_unique(array_merge($profile_dependencies, $profile_info['dependencies']));
     }
   }
+
+  // Fill the array keys with the values.
+  $profile_dependencies = array_combine($profile_dependencies, $profile_dependencies);
 
   // Is possible recursively seek all dependencies; not just those
   // of the profiles.
@@ -106,6 +116,111 @@ function drush_profile_enable_validate($profile) {
 
     return FALSE;
   }
+
+  // Get the list of enabled modules.
+  $enabled_modules = drush_module_list();
+
+  // Prepare the final list of dependencies that need to be enabled.
+  $final_dependencies = array_diff($profile_dependencies, $enabled_modules);
+
+  // Check the status of the requested profile.
+  if (in_array($profile, $enabled_modules)) {
+    // If it is already enabled, show a message.
+    drush_log(dt('!profile is already enabled.', array('!profile' => $profile)), 'ok');
+  }
+  else {
+    // Add the profile to the list of dependencies if not already enabled.
+    $final_dependencies[$profile] = $profile;
+  }
+
+  // Remove any modules which do not meet the requirements to be enabled.
+  foreach ($final_dependencies as $key => $module) {
+    if (!drupal_check_module($module)) {
+      unset($final_dependencies[$key]);
+      drush_set_error('DRUSH_PM_ENABLE_MODULE_UNMEET_REQUIREMENTS', dt('Module !module doesn\'t meet the requirements to be enabled.', array('!module' => $module)));
+      _drush_log_drupal_messages();
+      return FALSE;
+    }
+  }
+
+  // Set the final dependency list in the drush context to allow it to be
+  // utilised in the drush callback function.
+  drush_set_context('PROFILE_ENABLE_DEPENDENCIES', $final_dependencies);
+
+  return TRUE;
+}
+
+/**
+ * Command callback: Enable the profile selected by the user.
+ *
+ * This function will also enable all dependencies of the install profile as
+ * determined by the validate function above.
+ *
+ * @param string $profile
+ *   Name of a Drupal installation profile.
+ *
+ * @see drush_profile_enable_validate
+ */
+function drush_profile_enable($profile) {
+  // Get the list of dependencies that were built in the validate function.
+  $profile_dependencies = drush_get_context('PROFILE_ENABLE_DEPENDENCIES');
+
+  // If there are profile dependencies, ask the user for confirmation before we
+  // just go an enable them..
+  if (!empty($profile_dependencies) && is_array($profile_dependencies)) {
+    drush_print(dt('The following extensions will be enabled: !extensions', array('!extensions' => implode(', ', $profile_dependencies))));
+    if (!drush_confirm(dt('Do you really want to continue?'))) {
+      return drush_user_abort();
+    }
+  }
+
+  // Enable modules and pass dependency validation in form submit.
+  if (!empty($profile_dependencies)) {
+    drush_include_engine('drupal', 'environment');
+    drush_module_enable($profile_dependencies);
+  }
+
+  // Inform the user of the status of the profile dependencies.
+  // Get the status of all dependencies we tried to enable.
+  $result_extensions = drush_get_named_extensions_list($profile_dependencies);
+
+  // Keep track of all dependencies that did not enable correctly.
+  $problem_dependencies = array();
+
+  // Get the role handler class.
+  $role = drush_role_get_class();
+
+  // Loop through the dependencies.
+  foreach ($result_extensions as $name => $extension) {
+    // Check if the dependency is enabled.
+    if ($extension->status) {
+      // If the dependency enabled properly, let the user know.
+      drush_log(dt('!extension was enabled successfully.', array('!extension' => $name)), 'ok');
+
+      // Check if the dependency defind any permissions..
+      $perms = $role->getModulePerms($name);
+
+      // Let the user know about the permissions.
+      if (!empty($perms)) {
+        drush_print(dt('!extension defines the following permissions: !perms', array(
+          '!extension' => $name,
+          '!perms' => implode(', ', $perms),
+        )));
+      }
+    }
+    else {
+      // This dependency couldn't be enabled.
+      $problem_dependencies[] = $name;
+    }
+  }
+
+  // Alert the user of all dependencies that could not be enabled.
+  if (!empty($problem_dependencies)) {
+    return drush_set_error('DRUSH_PROFILE_ENABLE_DEPENDENCY_ISSUE', dt('There was a problem enabling !extension.', array('!extension' => implode(',', $problem_extensions))));
+  }
+
+  // Return the list of extensions enabled.
+  return $profile_dependencies;
 }
 
 /**
