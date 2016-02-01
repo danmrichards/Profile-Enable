@@ -46,6 +46,8 @@ function profile_enable_drush_command() {
  *   Name of a Drupal installation profile.
  */
 function drush_profile_enable_validate($profile) {
+  drush_include_engine('drupal', 'environment');
+
   // Get the list of valid module names.
   $valid_module_names = array_keys(drush_get_modules());
 
