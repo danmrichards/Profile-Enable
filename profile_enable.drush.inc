@@ -180,39 +180,41 @@ function drush_profile_enable($profile) {
   if (!empty($profile_dependencies)) {
     drush_include_engine('drupal', 'environment');
     drush_module_enable($profile_dependencies);
+
+    // Inform the user of the status of the profile dependencies.
+    // Get the status of all dependencies we tried to enable.
+    $result_extensions = drush_get_named_extensions_list($profile_dependencies);
   }
 
-  // Inform the user of the status of the profile dependencies.
-  // Get the status of all dependencies we tried to enable.
-  $result_extensions = drush_get_named_extensions_list($profile_dependencies);
-
   // Keep track of all dependencies that did not enable correctly.
-  $problem_dependencies = array();
+  if (isset($result_extensions) && count($result_extensions)) {
+    $problem_dependencies = array();
 
-  // Get the role handler class.
-  $role = drush_role_get_class();
+    // Get the role handler class.
+    $role = drush_role_get_class();
 
-  // Loop through the dependencies.
-  foreach ($result_extensions as $name => $extension) {
-    // Check if the dependency is enabled.
-    if ($extension->status) {
-      // If the dependency enabled properly, let the user know.
-      drush_log(dt('!extension was enabled successfully.', array('!extension' => $name)), 'ok');
+    // Loop through the dependencies.
+    foreach ($result_extensions as $name => $extension) {
+      // Check if the dependency is enabled.
+      if ($extension->status) {
+        // If the dependency enabled properly, let the user know.
+        drush_log(dt('!extension was enabled successfully.', array('!extension' => $name)), 'ok');
 
-      // Check if the dependency defind any permissions..
-      $perms = $role->getModulePerms($name);
+        // Check if the dependency defind any permissions..
+        $perms = $role->getModulePerms($name);
 
-      // Let the user know about the permissions.
-      if (!empty($perms)) {
-        drush_print(dt('!extension defines the following permissions: !perms', array(
-          '!extension' => $name,
-          '!perms' => implode(', ', $perms),
-        )));
+        // Let the user know about the permissions.
+        if (!empty($perms)) {
+          drush_print(dt('!extension defines the following permissions: !perms', array(
+            '!extension' => $name,
+            '!perms' => implode(', ', $perms),
+          )));
+        }
       }
-    }
-    else {
-      // This dependency couldn't be enabled.
-      $problem_dependencies[] = $name;
+      else {
+        // This dependency couldn't be enabled.
+        $problem_dependencies[] = $name;
+      }
     }
   }
 
