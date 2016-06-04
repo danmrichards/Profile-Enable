@@ -24,7 +24,7 @@ function profile_enable_drush_command() {
     'description' => 'Enable/Re-Enable a Drupal installation profile and all dependencies. Support inherited profiles.',
     'callback' => 'drush_profile_enable',
     'arguments' => array(
-      'profile' => 'Name of the installation profile to (re)enable.',
+      'profile' => 'Name of the installation profile to (re)enable. Optional argument (defaults to current install_profile variable).',
     ),
     'examples' => array(
       'drush pe minimal' => '(Re)Enables the minimal profile and all it\'s dependencies',
@@ -45,7 +45,11 @@ function profile_enable_drush_command() {
  * @param string $profile
  *   Name of a Drupal installation profile.
  */
-function drush_profile_enable_validate($profile) {
+function drush_profile_enable_validate($profile = NULL) {
+  if (is_null($profile)) {
+    $profile = variable_get('install_profile', 'standard');
+  }
+
   drush_include_engine('drupal', 'environment');
 
   // Get the list of valid module names.
@@ -163,7 +167,11 @@ function drush_profile_enable_validate($profile) {
  *
  * @see drush_profile_enable_validate
  */
-function drush_profile_enable($profile) {
+function drush_profile_enable($profile = NULL) {
+  if (is_null($profile)) {
+    $profile = variable_get('install_profile', 'standard');
+  }
+
   // Get the list of dependencies that were built in the validate function.
   $profile_dependencies = drush_get_context('PROFILE_ENABLE_DEPENDENCIES');
 
