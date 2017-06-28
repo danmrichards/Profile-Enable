@@ -242,4 +242,3 @@ function drush_profile_enable() {
 function _profile_enable_get_present_modules() {
   return array_keys(drupal_system_listing('/^' . DRUPAL_PHP_FUNCTION_PATTERN . '\.module$/', 'modules', 'name', 0));
 }
-
