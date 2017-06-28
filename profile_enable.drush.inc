@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Provide Drush integration for (re)enabling Drupal installation profiles.
@@ -22,12 +23,11 @@ function profile_enable_drush_command() {
 
   $items['profile-enable'] = array(
     'description' => 'Enable/Re-Enable a Drupal installation profile and all dependencies. Support inherited profiles.',
-    'callback' => 'drush_profile_enable',
     'arguments' => array(
       'profile' => 'Name of the installation profile to (re)enable. Optional argument (defaults to current install_profile variable).',
     ),
     'examples' => array(
-      'drush pe minimal' => '(Re)Enables the minimal profile and all it\'s dependencies',
+      'drush pe minimal' => "(Re)Enables the minimal profile and all it's dependencies",
     ),
     'aliases' => array('pe'),
   );
@@ -44,6 +44,9 @@ function profile_enable_drush_command() {
  *
  * @param string $profile
  *   Name of a Drupal installation profile.
+ *
+ * @return bool
+ *   An indicator whether command passed the validation process.
  */
 function drush_profile_enable_validate($profile = NULL) {
   if (is_null($profile)) {
@@ -143,7 +146,7 @@ function drush_profile_enable_validate($profile = NULL) {
   foreach ($final_dependencies as $key => $module) {
     if (!drupal_check_module($module)) {
       unset($final_dependencies[$key]);
-      drush_set_error('DRUSH_PM_ENABLE_MODULE_UNMEET_REQUIREMENTS', dt('Module !module doesn\'t meet the requirements to be enabled.', array('!module' => $module)));
+      drush_set_error('DRUSH_PM_ENABLE_MODULE_UNMEET_REQUIREMENTS', dt("Module !module doesn't meet the requirements to be enabled.", array('!module' => $module)));
       _drush_log_drupal_messages();
       return FALSE;
     }
@@ -162,16 +165,9 @@ function drush_profile_enable_validate($profile = NULL) {
  * This function will also enable all dependencies of the install profile as
  * determined by the validate function above.
  *
- * @param string $profile
- *   Name of a Drupal installation profile.
- *
- * @see drush_profile_enable_validate
+ * @see drush_profile_enable_validate()
  */
-function drush_profile_enable($profile = NULL) {
-  if (is_null($profile)) {
-    $profile = variable_get('install_profile', 'standard');
-  }
-
+function drush_profile_enable() {
   // Get the list of dependencies that were built in the validate function.
   $profile_dependencies = drush_get_context('PROFILE_ENABLE_DEPENDENCIES');
 
@@ -228,7 +224,7 @@ function drush_profile_enable($profile = NULL) {
 
   // Alert the user of all dependencies that could not be enabled.
   if (!empty($problem_dependencies)) {
-    return drush_set_error('DRUSH_PROFILE_ENABLE_DEPENDENCY_ISSUE', dt('There was a problem enabling !extension.', array('!extension' => implode(',', $problem_extensions))));
+    return drush_set_error('DRUSH_PROFILE_ENABLE_DEPENDENCY_ISSUE', dt('There was a problem enabling !extension.', array('!extension' => implode(',', $problem_dependencies))));
   }
 
   // Return the list of extensions enabled.
@@ -238,17 +234,12 @@ function drush_profile_enable($profile = NULL) {
 /**
  * Get a list of modules that exist in Drupal's assorted subdirectories.
  *
- * @return array
+ * @return string[]
  *   List of modules present in the codebase.
+ *
+ * @internal
  */
 function _profile_enable_get_present_modules() {
-  $present_modules = array();
-
-  // Get a list of modules that exist in Drupal's assorted subdirectories.
-  foreach (drupal_system_listing('/^' . DRUPAL_PHP_FUNCTION_PATTERN . '\.module$/', 'modules', 'name', 0) as $present_module) {
-    $present_module_path = drupal_get_path('module', $present_module->name);
-    $present_modules[] = $present_module->name;
-  }
-
-  return $present_modules;
+  return array_keys(drupal_system_listing('/^' . DRUPAL_PHP_FUNCTION_PATTERN . '\.module$/', 'modules', 'name', 0));
 }
+
